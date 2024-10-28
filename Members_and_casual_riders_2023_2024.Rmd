@@ -1,0 +1,236 @@
+---
+title: "Cyclistic Members And Casual Riders 2023 - 2024"
+author: "Silvia"
+date: "2024-10-27"
+output: html_document
+---
+
+# Business Task Statement:
+
+Cyclistic has identified that annual members are more profitable than casual riders. To support future growth, the goal of this analysis is to understand the differences in bike usage between the two groups and, based on this, design marketing strategies to convert casual riders into annual members.
+
+# Data Sources:
+
+For this business task, 12 data sets containing information about trips taken on its bike sharing system where provided. All sets have the same structure and contain the following columns:
+
+| Variable            | Description                                                   |
+|---------------------|---------------------------------------------------------------|
+| `ride_id`           | Unique ID for each trip                                       |
+| `rideable_type`     | Bike type used for the trip                                   |
+| `started_at`        | The timestamp marking when the ride started                   |
+| `ended_at`          | The timestamp marking when the ride ended                     |
+| `start_station_name`| The name of the station where the ride begins                 |
+| `start_station_id`  | Unique ID for each station                                    |
+| `end_station_name`  | The name of the station where the ride ends                   |
+| `end_station_id`    | Unique ID for each station                                    |
+| `start_lat`         | The latitude coordinate of the ride's starting location       |
+| `start_lng`         | The longitude coordinate of the ride's starting location      |
+| `end_lat`           | The latitude coordinate of the ride's ending location         |
+| `end_lng`           | The longitude coordinate of the ride's starting location      |
+| `member_casual`     | Indicates whether the user is a 'member' or a 'casual' rider  |
+
+**Time Periods**: The data sets used, cover the period between September 2023 and September 2024.
+
+**Update Frequency**: The data is historical and is not updated.
+
+Combining these data sets allows for a more thorough analysis of bike usage patterns in Cyclistic, making it easier to compare annual members with casual users.
+
+# Data preparation:
+
+This section describes the actions taken to prepare the data sets for analysis, including any necessary cleaning and manipulation.
+
+## Installing packages and/or libraries needed:
+```{r libraries}
+library(dplyr)
+library(readr)
+```
+
+## Loading datasets:
+
+```{r loading datasets}
+# Combining all files into a single data frame:
+
+# defining data path
+data_path <- "~/Desktop/CASE STUDIES/DATASETS COPY - CYCLISTIC BIKE-SHARE"
+
+# loading all datasets in a single dataframe
+all_data <- bind_rows(lapply(list.files(path = data_path, pattern = "*.csv", full.names = TRUE), read_csv))
+```
+
+# Data Cleaning:
+
+```{r removing duplicates}
+# removing duplicates
+all_data <- distinct(all_data)
+```
+
+
+```{r removing N/A values}
+# removing N/A values
+all_data <- na.omit(all_data)
+```
+
+```{r verifying missing values}
+# Verifying that there are not missing values in any column
+colSums(is.na(all_data))
+```
+
+# Data analisys:
+
+This analysis aims to examine the differences in bike usage between annual members and casual riders of Cyclistic. Through a descriptive analysis of trip data, we will explore patterns in usage frequency, trip duration, and the most popular routes. By identifying these differences, we seek to provide valuable insights that will enable Cyclistic to develop effective marketing strategies to convert casual riders into annual members, thereby optimizing the profitability of the service.
+
+## Descriptive analysis:
+
+```{r Total number of ride by users}
+# calculating the total number of ride by users
+total_rides <- all_data %>% 
+  group_by(member_casual) %>% 
+  summarise(total_trips = n())
+```
+
+```{r adding duration}
+# Calculating trip duration in minutes and adding "duration" as a new column
+all_data <- all_data %>%
+  mutate(duration = as.numeric(difftime(ended_at, started_at, units = "mins")))
+```
+
+```{r calculating average trip duration}
+# Calculating the average trip duration 
+average_duration <- all_data %>% 
+  group_by(member_casual) %>% 
+  summarise(avg_duration = mean(duration))
+```
+
+```{r calculating usage frequency}
+# Calculating usage frequency
+usage_frequency <- all_data %>% 
+  mutate(date = as.Date(started_at)) %>% 
+  group_by(member_casual, date) %>% 
+  summarise(daily_trips = n()) %>% 
+  ungroup() %>% 
+  group_by(member_casual) %>% 
+  summarise(avg_daily_trips = mean(daily_trips))
+```
+
+```{r combining results}
+# combining results by joining average duration and usage frequency
+summary_df <- total_rides %>%
+  left_join(average_duration, by = "member_casual") %>%
+  left_join(usage_frequency, by = "member_casual")
+
+print(summary_df)
+```
+
+# Data visualization:
+
+To further illustrate and compare the usage patterns of annual members and casual riders, the following visualizations will highlight key metrics such as total trip count, average trip duration, and daily usage frequency. These insights will help identify behavioral trends that can inform Cyclistic's marketing strategies aimed at converting casual riders into loyal, annual members.
+
+## Installing libraries for vizualization:
+
+```{r}
+library(ggplot2)
+```
+
+## Proceading to create data visualizations to better illustrate analysis:
+
+```{r bar chart}
+# creating a bar chart to illustrate the Total of the Trips
+
+ggplot(data = summary_df, aes(x = member_casual, y = total_trips, fill = member_casual)) +
+  geom_bar(stat = "identity") + scale_y_continuous(labels = scales::comma) +  geom_text(aes(label = scales::comma(total_trips)), 
+            vjust = -0.5, 
+            size = 4, 
+            color = "black") +
+  labs(title = "Total Rides by User Type", x = "User Type", y = "Total Rides") +
+  theme_minimal()
+```
+
+```{r bar chart to avg ride duration}
+# creating a Bar Chart to illustrate average ride duration
+ggplot(data = summary_df, aes(x = member_casual, y = avg_duration, fill = member_casual)) +
+  geom_bar(stat = "identity") +
+  scale_y_continuous(labels = scales::comma) +
+  geom_text(aes(label = round(avg_duration, 1)),
+            vjust = -0.5, 
+            size = 4, 
+            color = "black") +
+  labs(title = "Average Ride Duration by User Type", x = "User Type", y = "Average Ride Duration (minutes)") +
+  theme_minimal()
+```
+
+```{r bar chart with avrage daily trips}
+ggplot(data = summary_df, aes(x = member_casual, y = avg_daily_trips, fill = member_casual)) +
+  geom_bar(stat = "identity") +
+  scale_y_continuous(labels = scales::comma) +
+  geom_text(aes(label = round(avg_daily_trips, 1)),
+            vjust = -0.5, 
+            size = 4, 
+            color = "black") +
+  labs(title = "Average Daily Trips by User Type", x = "User Type", y = "Average Daily Trips") +
+  theme_minimal()
+
+```
+
+# Futher data exploration:
+
+##Exploring relationship between rider type and weekday
+
+```{r weekday}
+#creating a new column for days of the week
+all_data <- all_data %>% 
+  mutate(day_of_the_week = weekdays(as.Date(started_at)))
+```
+
+```{r}
+avg_duration_by_day <- all_data %>% 
+  filter(member_casual == "casual") %>% 
+  group_by(day_of_the_week) %>% 
+  summarise(avg_duration_by_day = mean(duration))
+```
+
+# Comparing durations between weekdays and weekends for casual users
+
+```{r weekends and weekdays for casuals}
+avg_duration_weekday_vs_weekend <- all_data %>% 
+  filter(member_casual == "casual") %>% 
+  mutate(day_type = ifelse(day_of_the_week %in% c("Saturday", "Sunday"), "weekend","weekday")) %>%
+  group_by(day_type) %>% 
+  summarise(avg_duration = mean(duration))
+```
+
+# Visual to further understanding
+
+```{r}
+ggplot(avg_duration_weekday_vs_weekend, aes(x = day_type, y = avg_duration, fill = day_type)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Average Ride Duration for Casual Users (Weekday vs Weekend)",
+       x = "Day Type",
+       y = "Average Duration (minutes)") +
+  theme_minimal()
+```
+
+
+# Conclusions of the Analysis:
+
+Overall, the analysis shows that casual users tend to use Cyclistic mainly on weekends and for longer trips. This suggests that most casual users view Cyclistic as a recreational option rather than a daily commuting solution. However, their usage patterns present an opportunity to attract them to memberships through specific promotions, benefits for long trips, and options that allow them to enjoy the service more cost-effectively.
+
+Members have a higher usage frequency compared to casual users, this suggest that they see the Cyclistic's service as a part of their routine as in for casual users tend to use the service more sporadically, likely linked to recreational activities or occasional trips.
+
+The data shows that casual users tend to use the service more frequently on weekends, while members have a more uniform usage distribution throughout the week. This trend suggests that casual users view Cyclistic as a weekend leisure activity.
+
+# Recommendations for the marketing department:
+
+## 1. Weekend Membership Promotion
+Implement a membership promotion available primarily on weekends. 
+This could include:
+Special discounts for memberships activated over the weekend.
+Trial memberships for casual users to let them experience the benefits of being a member during peak usage times, like weekends.
+
+## 2. Benefits for Long Rides
+Create exclusive member benefits focused on trip duration, such as reduced rates after the first 30 minutes. This could appeal to casual users who tend to take longer rides, encouraging them to switch to membership to save on overall ride costs.
+
+## 3. Targeted Email or App Campaigns for Active Users
+Send notifications or direct marketing campaigns to frequent casual users, highlighting the advantages of an annual membership. Personalize the message to emphasize how the service can help them save if they subscribe to a membership.
+
+## 4. Encourag Usage on Weekdays
+To encourage casual users to also use the service on weekdays, Cyclistic could offer a series of benefits, such as a "Frequent User Bonus" or rewards for using the service a minimum number of times on weekdays. This can show them the service is also useful for daily activities.
